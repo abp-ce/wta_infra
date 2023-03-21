@@ -1,0 +1,61 @@
+version: '3.3'
+services:
+  psql:
+    image: postgres:alpine
+    restart: always
+    # ports:
+    #   - 5432:5432
+    env_file: ./.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  redis:
+    image: redis:alpine
+    restart: always
+    # ports:
+    #   - 6379:6379
+    volumes:
+      - redis_data:/data
+  
+  backend:
+    build: ./backend/
+    ports:
+      - 8000:8000
+    depends_on:
+      - psql
+      - redis
+    command: ./start.sh
+    restart: always
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+
+  celery:
+    build: ./backend/
+    depends_on:
+      - psql
+      - redis
+    command: celery -A app.tasks worker -B --loglevel=INFO
+    restart: always
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+
+  bot:
+    build: ./bot
+    depends_on:
+      - redis
+      - backend
+    command: python main.py
+    restart: always
+    env_file:
+      - ./bot/.env
+    volumes:
+      - ./bot:/app
+
+
+volumes:
+  postgres_data:
+  redis_data:
